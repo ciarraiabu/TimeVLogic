@@ -1,0 +1,119 @@
+---
+title: "LogicVTime"
+author: "MeadhbhHealy"
+date: "02/04/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+H0: There is no correlation between Logic and Time Taken to complete the puzzle.
+H1: There is a correlation between Logic and Time Taken to complete the puzzle.
+
+```{r include=FALSE}
+library(ggplot2)
+library(tidyverse)
+library(BayesFactor)
+library(RColorBrewer)
+library(statsr)
+library(dplyr)
+
+su<-read.csv("3SudokuCombined.csv")
+df <- su[-which(su$Logic == ""), ]
+df <- df[-which(df$Logic == "."),]
+df<-na.omit(df)
+summary(df)
+df$Time2<-as.numeric(df$Time2)
+X<-sapply(df[,8], as.numeric)
+Y<-sapply(df[,10], as.factor)
+logical<-data.frame(Y,X)
+
+yes<-df%>% filter(Logic=="Yes")
+no<-df%>% filter(Logic=="No")
+ind<-df%>%filter(Logic=="Indifferent")
+```
+
+```{r include=FALSE}
+logical<-logical %>% 
+        rename(
+         Time = X,
+         Logic = Y
+        )
+```
+
+```{r}
+summary(yes$Time2)
+```
+```{r}
+ggplot(yes, aes(Time2, fill = cut(Time2, 30))) +
+  geom_histogram(show.legend = FALSE, binwidth=5)+
+  scale_fill_discrete(h = c(240, 10))
+```
+```{r}
+summary(logical$Time)
+```
+In the study, the overall mean time of the population is 209 seconds. With Bayesian inference, we aim to ascertain whether the mean time in seconds just for participants is significantly different.
+```{r}
+bayes_inference(y=Time2, data=yes, statistic="mean", type="ht", null=209, alternative="twosided")
+```
+In conclusion, the population mean for those that said yes is significantly different to the general population. 
+
+
+```{r}
+ggplot(logical, aes(Time, fill = cut(Time, 20))) +
+  geom_histogram(show.legend = FALSE, binwidth=5)+
+  scale_fill_discrete(h = c(240, 10))
+
+```
+The data is extremely right skewed. It is not unimodal. There are several outliers on the right hand side.
+
+```{r}
+logical<-na.omit(logical)
+logical%>%
+  group_by(Logic)%>%
+  summarize(n=n(), avg=mean(Time), min=min(Time), q1=quantile(Time, .25), median= median(Time), q3=quantile(Time, .75), max=max(Time))
+```
+
+
+
+```{r}
+
+df1 <- logical[-which(logical$Logic == "Indifferent"),]
+
+df1$Logic <- factor(df1$Logic)
+
+bayes_inference(y=Time, x=Logic, data=df1, success="low", statistic="mean", type="ht", null=0.0, alternative="twosided")
+```
+
+
+```{r}
+p <- ggplot(data = logical,
+            mapping = aes(x = Time, fill = Logic, color = Logic))
+p + geom_density(alpha = 0.4) + scale_fill_brewer(palette="Paired") + 
+  scale_color_brewer(palette="Paired")+
+  ylab("Counts")
+```
+1=Yes, 2=Indifferent, 3=No
+```{r}
+logical$Logic<-as.numeric(logical$Logic)
+result <- cor.test(logical$Time, logical$Logic)
+result
+```
+Based on Pearson's correlation test above, the null hypothesis can be rejected as the p-value is <<0.05. The correlation between the two variables is significant and positive. i.e. If 3 means that the participant doesn't like logic the length of time in which they took to complete the puzzle increases.
+
+```{r}
+correlationBF(logical$Logic, logical$Time)
+```
+```{r}
+library(stargazer)
+```
+
+```{r}
+stargazer(mixed.lmer, type = "text",
+          digits = 3,
+          star.cutoffs = c(0.05, 0.01, 0.001),
+          digit.separator = "")
+```
+
