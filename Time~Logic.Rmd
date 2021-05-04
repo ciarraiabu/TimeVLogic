@@ -1,0 +1,123 @@
+---
+title: "Untitled"
+author: "MeadhbhHealy"
+date: "14/04/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r include=FALSE}
+library(ggplot2)
+library(tidyverse)
+library(RColorBrewer)
+library(dplyr)
+library(lme4)
+
+su<-read.csv("3SudokuCombined.csv")
+df <- su[-which(su$Logic == ""), ]
+df <- df[-which(df$Logic == "."),]
+df<-na.omit(df)
+```
+
+
+
+```{r include=FALSE}
+df$Time2<-as.numeric(df$Time2)
+#df$Logic<-as.numeric(df$Logic)
+X<-sapply(df[,8], as.numeric)
+Y<-sapply(df[,10], as.factor)
+logical<-data.frame(Y,X)
+
+yes<-df%>% filter(Logic=="Yes")
+no<-df%>% filter(Logic=="No")
+ind<-df%>%filter(Logic=="Indifferent")
+
+logical<-logical %>% 
+        rename(
+         Time = X,
+         Logic = Y
+        )
+```
+
+```{r warning=FALSE}
+ggplot(logical, aes(Time, fill = cut(Time, 20))) +
+  geom_histogram(show.legend = FALSE, binwidth=5)+
+  scale_fill_discrete(h = c(240, 10))
+```
+
+```{r}
+df$Logic.f <- factor(df$Logic)
+df <- within(df, {
+    Logic.ct <- C(Logic.f, helmert)
+    #print(attributes(Logic.ct))
+})
+```
+
+
+```{r}
+basic.lm <- lm(log(Time2) ~ Logic.f, data = df)
+summary(basic.lm)
+```
+
+```{r}
+plot(basic.lm, which = 2)
+```
+
+
+```{r warning=FALSE}
+(colour_plot <- ggplot(df, aes(x = Logic, y = Time2, colour = Class)) +
+  geom_point(size = 1, position = "jitter") +
+  theme_classic() +
+  scale_color_gradient(low="blue", high="red")+
+  theme(legend.position = "none")+
+   ylab("Time"))
+```
+
+
+```{r echo=FALSE}
+mixed.lmer <- lmer(log(Time2) ~ Logic.ct+(1|Class), data = df)
+summary(mixed.lmer)
+```
+
+```{r}
+anova(mixed.lmer, basic.lm)
+```
+
+```{r warning=FALSE}
+logical<-na.omit(logical)
+logical%>%
+  group_by(Logic)%>%
+  summarize(n=n(), avg=mean(Time), min=min(Time), q1=quantile(Time, .25), median= median(Time), q3=quantile(Time, .75), max=max(Time))
+```
+
+```{r}
+p <- ggplot(data = logical,
+            mapping = aes(x = Time, fill = Logic, color = Logic))
+p + geom_density(alpha = 0.4) + scale_fill_brewer(palette="Paired") + 
+  scale_color_brewer(palette="Paired")+
+  ylab("Counts")
+```
+
+
+```{r}
+df$Time2<-as.numeric(df$Time2)
+df$Type.f<-as.factor(df$Type)
+df$Logic.f<-as.factor(df$Logic)
+df$Before2.f<-as.factor(df$Before2)
+all.lm1 <- lm(Time2 ~ Logic.f+Type.f+Before2.f, data = df)
+summary(all.lm1)
+```
+```{r}
+df$Correct.f<-as.factor(df$Correct)
+all.lm2 <- glm(Correct.f ~ Logic.f+Type.f+Before2.f, family=binomial, data = df)
+summary(all.lm2)
+```
+```{r}
+coefficients(all.lm2) %>% exp()
+```
+
